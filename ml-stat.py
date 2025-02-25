@@ -250,6 +250,11 @@ class EmailThread(EmailPost):
             if msg.is_pwbot_command() or msg.is_pwbot_accept():
                 last = d
                 break
+            # for prolonged threads also enable "cutting looong tail" heuristic
+            if d - begin > datetime.timedelta(days=5):
+                # reply after a long period of silence
+                if d - last > 1.4 * (last - begin):
+                    break
             last = d
 
         # round up to one day
