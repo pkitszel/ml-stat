@@ -106,31 +106,36 @@ class EmailMsg(EmailPost):
 
         self.msg = msg
 
-        self._review = None
+        self._body_processed = None
+        self._review = False
         self._accept = None
+        self._pw_cmd = False
 
-    def _is_review_tag(self):
+    def _process_body(self):
+        if self._body_processed is not None:
+            return
+        self._body_processed = True
         # TODO: also match RE?
         if not self.subject().startswith('Re: '):
-            return False
+            return
 
         body = self.msg.get_body(preferencelist=('plain',))
         if body is None:
-            return False
+            return
         try:
             body_str = body.as_string()
         except LookupError:
-            return False
+            return
 
         lines = body_str.split()
         for l in lines:
             if l.startswith('Reviewed-') or l.startswith('Acked-'):
-                return True
-        return False
+                self._review = True
+            if l.startswith('pw-bot:'):
+                self._pw_cmd = True
 
     def is_review_tag(self):
-        if self._review is None:
-            self._review = self._is_review_tag()
+        self._process_body()
         return self._review
 
     def is_pwbot_accept(self):
@@ -138,6 +143,10 @@ class EmailMsg(EmailPost):
             from_hdr = self.msg.get('From')
             self._accept = from_hdr.startswith('patchwork-bot+') and '@kernel.org' in from_hdr
         return self._accept
+
+    def is_pwbot_command(self):
+        self._process_body()
+        return self._pw_cmd
 
     def get(self, key):
         return self.msg.get(key)
@@ -167,6 +176,9 @@ class EmailMsg(EmailPost):
 
             ret.append(addr)
         return ret
+
+    def date(self):
+        return email_datetime(self.msg)
 
 
 class EmailThread(EmailPost):
@@ -228,6 +240,20 @@ class EmailThread(EmailPost):
                     people[person] += 1
         remove_bots(people)
         return people
+
+    def timespan(self):
+        begin = self.root_msg.date()
+        last = begin
+        # messages are sorted by time, incidentally
+        for msg in self.msgs:
+            d = msg.date()
+            if msg.is_pwbot_command() or msg.is_pwbot_accept():
+                last = d
+                break
+            last = d
+
+        # round up to one day
+        return max(last - begin, datetime.timedelta(days=1))
 
 
 class ChangeSet:
@@ -920,11 +946,13 @@ def calc_ppl_stat(args, ps, db, corp):
         parti = thr.participants(use_map)
         for p in parti:
             if p not in ppl_stat:
-                ppl_stat[p] = {'author': {'cs': 0, 'thr': 0, 'msg': 0},
+                ppl_stat[p] = {'author': {'cs': 0, 'thr': 0, 'msg': 0, 'pr_dur': datetime.timedelta()},
                                'reviewer': {'cs': 0, 'thr': 0, 'msg': 0}}
             if p in authors:
                 ppl_stat[p]['author']['thr'] += 1
                 ppl_stat[p]['author']['msg'] += authors[p]
+                if thr.is_pr():
+                    ppl_stat[p]['author']['pr_dur'] += thr.timespan()
             else:
                 ppl_stat[p]['reviewer']['thr'] += 1
                 ppl_stat[p]['reviewer']['msg'] += parti[p]
@@ -946,6 +974,14 @@ def calc_ppl_stat(args, ps, db, corp):
         score += 2 * (ppl_stat[p]['reviewer']['msg'] - 1)
         score -= 4 * ppl_stat[p]['author']['msg']
         ppl_stat[p]['score'] = {'positive': score, 'negative': -score}
+
+    if not corp:
+        print("PR timespans:")
+        for p in ppl_stat.keys():
+            ts = ppl_stat[p]['author']['pr_dur']
+            if ts:
+                print("Total PR timespan of", ts, "for", p)
+        print()
 
     if args.proc:
         pass
