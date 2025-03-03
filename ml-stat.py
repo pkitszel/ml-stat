@@ -257,8 +257,8 @@ class EmailThread(EmailPost):
                     break
             last = d
 
-        # round up to one day
-        return max(last - begin, datetime.timedelta(days=1))
+        # round up to one day, exclude weekends
+        return max(timedelta_without_weekends(begin, last), datetime.timedelta(days=1))
 
 
 class ChangeSet:
@@ -314,6 +314,21 @@ def email_datetime(m):
 
 def email_str_date(m):
     return str(email_datetime(m).date())
+
+
+def timedelta_without_weekends(beg, end):
+    one_day = datetime.timedelta(days=1)
+    one_week = one_day * 7
+    Friday = 5
+    diff_days = 0
+    while beg <= end - one_week:
+        diff_days += 5
+        end -= one_week
+    while beg <= end - one_day:
+        if end.weekday() <= Friday:
+            diff_days += 1
+        end -= one_day
+    return end - beg + one_day * diff_days
 
 
 def git(tree, cmd, silent=None):
