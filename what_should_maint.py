@@ -182,7 +182,7 @@ def of_reviewed_pct(d):
 
 
 def pr_header():
-    print("{:33} {:>6}  {:<12} {:<12} {:<8}".format("", "total", "author", "review", "metric"))
+    print("{:43} {:>6}  {:<12} {:<12} {:<8}".format("", "total", "author", "review", "metric"))
 
 
 def pr_stat(i, s, extra=0):
@@ -191,12 +191,12 @@ def pr_stat(i, s, extra=0):
     else:
         extra = ""
     tot = len(s["commits"])
-    print("{:2} {:30} {:6} {:3} ({:5}%) {:3} ({:5}%)  {:2}".
+    print("{:2} {:40} {:6} {:3} ({:5}%) {:3} ({:5}%)  {:2}".
           format(i, s["path"], tot,
                  s["author"],
-                 round(s["author"] / tot * 100, 2),
+                 round(s["author"] / max(tot, 1) * 100, 2),
                  s["reviewer"],
-                 round(s["reviewer"] / tot * 100, 2),
+                 round(s["reviewer"] / max(tot, 1) * 100, 2),
                  extra))
 
 
