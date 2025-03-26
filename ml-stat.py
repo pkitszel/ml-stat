@@ -258,7 +258,7 @@ class EmailThread(EmailPost):
             last = d
 
         # round up to one day, exclude weekends
-        return max(timedelta_without_weekends(begin, last), datetime.timedelta(days=1))
+        return max(timedelta_without_weekends(begin, last), datetime.timedelta(days=1)).total_seconds()
 
 
 class ChangeSet:
@@ -966,7 +966,7 @@ def calc_ppl_stat(args, ps, db, corp):
         parti = thr.participants(use_map)
         for p in parti:
             if p not in ppl_stat:
-                ppl_stat[p] = {'author': {'cs': 0, 'thr': 0, 'msg': 0, 'pr_dur': datetime.timedelta()},
+                ppl_stat[p] = {'author': {'cs': 0, 'thr': 0, 'msg': 0, 'pr_dur': 0},
                                'reviewer': {'cs': 0, 'thr': 0, 'msg': 0}}
             if p in authors:
                 ppl_stat[p]['author']['thr'] += 1
@@ -1000,7 +1000,9 @@ def calc_ppl_stat(args, ps, db, corp):
         for p in ppl_stat.keys():
             ts = ppl_stat[p]['author']['pr_dur']
             if ts:
+                ts = datetime.timedelta(seconds=ts)
                 print("Total PR timespan of", ts, "for", p)
+                ppl_stat[p]['author']['pr_dur']
         print()
 
     if args.proc:
